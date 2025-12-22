@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  {% include head.html %}
+  <link rel="stylesheet" href="{{ '/assets/css/custom.css' | relative_url }}">
+</head>
+<body id="page-top">
+  
+{% include project-banner.html %}
+
+{{ content }}
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="{{ '/assets/js/mermaid-init.js' | relative_url }}"></script>
+  
+  <!-- Floating TOC -->
+  <script src="{{ '/assets/js/floating-toc.js' | relative_url }}"></script>
+</body>
+</html>

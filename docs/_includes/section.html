@@ -1,0 +1,10 @@
+<section id="{{ include.id }}" class="page-section">
+  <div class="container">
+    <h2 class="section-heading text-uppercase">{{ include.title }}</h2>
+
+    <div class="section-content">
+{% capture md %}{% include_relative sections/{{ include.file }} %}{% endcapture %}
+{{ md | markdownify }}
+    </div>
+  </div>
+</section>

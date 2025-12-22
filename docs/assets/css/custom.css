@@ -1,0 +1,292 @@
+/* ===== Page shell ===== */
+.page-shell {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  /* width: 100%; */
+  overflow-x: clip;   NOT hidden
+  /* box-sizing: border-box; */
+  inline-size: 100%;
+  max-inline-size: 100%;
+}
+
+.page-shell *,
+.page-shell *::before,
+.page-shell *::after {
+  box-sizing: border-box;
+}
+
+.page-sections .container {
+  max-width: 100%;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* ===== Floating TOC ===== */
+
+.floating-toc {
+  position: sticky;
+  top: 0rem;
+  margin-top: 0rem;
+  align-self: flex-start;
+  left: 0;
+  width: 280px;
+  height: 100vh;
+  overflow-y: auto;
+  background: #f8f9fa;
+  border-right: 1px solid #ddd;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  z-index: 1000;
+}
+
+/* Header */
+.toc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.toc-controls button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-left: 0.25rem;
+}
+
+/* TOC structure */
+#toc-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+/* TOC vertical spacing */
+#toc-list > li {
+  margin-bottom: 0.75rem;
+}
+
+.toc-section > ul > li {
+  margin-bottom: 0.5rem;
+}
+
+.floating-toc a {
+  line-height: 1.4;
+}
+
+.toc-section > ul {
+  display: none;
+  list-style: none;
+  padding-left: 1rem;
+}
+
+.toc-section.expanded > ul {
+  display: block;
+}
+
+/* Links */
+.floating-toc a {
+  text-decoration: none;
+  color: #333;
+}
+
+.floating-toc a.active {
+  font-weight: 600;
+  color: #0056b3;
+}
+
+/* Indentation */
+.toc-h2 { margin-left: 0.5rem; }
+.toc-h3 { margin-left: 1.2rem; font-size: 0.85em; }
+
+/* ===== Layout offset ===== */
+/* Push main content right so it doesn't go under TOC */
+.page-section {
+  /* margin-left: 300px; */
+  padding-top: 2.5rem;
+  padding-bottom: 3rem;
+  /* margin: 0; */
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.page-section:first-of-type {
+  padding-top: 2.5rem;
+}
+
+/* ===== Mobile behavior ===== */
+@media (max-width: 992px) {
+  .floating-toc {
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+
+  .floating-toc.mobile-visible {
+    transform: translateX(0);
+  }
+
+  .page-section {
+    margin-left: 0;
+  }
+}
+
+/* Mobile TOC toggle button */
+.mobile-toc-button {
+  display: none;
+  position: sticky;
+  top: 0.5rem;
+  margin: 0.5rem 0 0.5rem 0.5rem;
+  left: 10px;
+  z-index: 1100;
+  background: #0056b3;
+  color: #fff;
+  border: none;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* Mobile behavior */
+@media (max-width: 992px) {
+  .mobile-toc-button {
+    display: block;
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 1200;
+    background: #0056b3;
+    color: #ffffff;
+    border: none;
+    padding: 0.45rem 0.6rem;
+    border-radius: 6px;
+    font-size: 1.25rem;
+    cursor: pointer;
+  }
+
+  .floating-toc {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;          /* full vertical space */
+    padding-top: 4rem; /* space for hamburger button */
+    transform: translateX(-100%);
+    background: rgba(248, 249, 250, 0.75);
+    -webkit-backdrop-filter: blur(7px);
+    backdrop-filter: blur(7px);
+    box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+  }
+
+  .floating-toc.mobile-visible {
+    transform: translateX(0);
+  }
+
+  .page-sections {
+    margin-left: 3rem;  /* adjust if you change hamburger size */
+  }
+}
+
+/* ===== Project Banner ===== */
+
+.project-banner {
+  background:
+    linear-gradient(135deg, rgba(0,40,80,0.85), rgba(0,86,179,0.85)),
+    var(--banner-image, linear-gradient(135deg, #003366, #0056b3));
+  background-size: cover;
+  background-position: center;
+  color: #ffffff;
+  margin-bottom: 0;
+}
+
+.banner-overlay {
+  padding: 2.5rem 1rem 2rem 1rem;
+}
+
+
+.banner-content {
+  max-width: 1100px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.project-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+
+.project-subtitle {
+  font-size: 1.1rem;
+  font-weight: 400;
+  margin: 0 0 1rem 0;
+  opacity: 0.9;
+}
+
+.project-meta {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+/* Mobile scaling */
+@media (max-width: 768px) {
+  .project-title {
+    font-size: 1.6rem;
+  }
+
+  .project-subtitle {
+    font-size: 1rem;
+  }
+}
+
+.page-sections {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 2rem;
+}
+
+/* ===== Figure caption styling ===== */
+
+/* Images followed by italic caption text */
+img + em,
+img + p > em {
+  display: block;
+  margin-top: 0.4rem;
+  margin-bottom: 1.5rem;
+
+  font-size: 0.85rem;
+  color: #555;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* Center images by default */
+.page-sections img {
+  display: block;
+  margin: 1.2rem auto 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.page-sections pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* 2. Constrain Mermaid diagrams */
+.mermaid {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.mermaid svg {
+  width: 100%;
+  height: auto;
+}
+
+.mermaid svg {
+  cursor: grab;
+}
+.mermaid svg:active {
+  cursor: grabbing;
+}

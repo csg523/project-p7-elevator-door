@@ -1,0 +1,18 @@
+<header class="project-banner"
+  {% if site.banner_image %}
+    style="--banner-image: url('{{ site.banner_image | relative_url }}');"
+  {% endif %}
+>
+  <div class="banner-overlay">
+    <div class="banner-content">
+      <h1 class="project-title">{{ site.title }}</h1>
+      <p class="project-subtitle">{{ site.description }}</p>
+
+      {% if site.project_meta %}
+      <div class="project-meta">
+        {{ site.project_meta }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</header>

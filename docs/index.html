@@ -1,0 +1,30 @@
+---
+layout: default
+---
+<button id="mobile-toc-button" class="mobile-toc-button">
+  ☰
+</button>
+
+<div class="page-shell">
+
+    <nav id="floating-toc" class="floating-toc">
+        <div class="toc-header">
+            <span>Contents</span>
+            <div class="toc-controls">
+            <button id="toc-expand-all" title="Expand all">＋</button>
+            <button id="toc-collapse-all" title="Collapse all">－</button>
+            <button id="toc-toggle-mobile" title="Toggle TOC">☰</button>
+            </div>
+        </div>
+        <ul id="toc-list"></ul>
+    </nav>
+
+    <div class="page-sections">
+{% include section.html id="intro" title="Introduction" file="intro.md" %}
+{% include section.html id="requirements" title="Requirements" file="requirements.md" %}
+{% include section.html id="uml" title="UML State Charts" file="uml-statecharts.md" %}
+{% include section.html id="architecture" title="Architecture" file="architecture.md" %}
+{% include section.html id="testing" title="Testing and Verification" file="testing-verification.md" %}
+    </div>
+
+</div>
