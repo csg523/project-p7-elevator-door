@@ -8,14 +8,14 @@ Responsibility:
 - Initialize and coordinate system
 
 Encapsulates:
-- <BootState>
+- BootState
 
 Interface:
-- <system_init()>
-- <system_reset()>
+- system_init()
+- system_reset()
 
 Owner:
-- TBD
+- Group
 "]
 
 System --> UART["UART INTERFACE
@@ -34,16 +34,19 @@ Ankit Kumar Sahoo
 
 System --> Supervisor["SUPERVISOR / STATE MACHINE
 Responsibility:
-- Own and manage door state
+- Own and validate door state transitions
 
 Encapsulates:
-- <CurrentState>
+- CurrentState
+- PreviousState
+- DwellTimer
 
 Interface:
-- <handle_event()>
+- handle_event(event)
+- get_state()
 
 Owner:
-- TBD
+- Group
 "]
 
 System --> Logger["LOGGER
@@ -62,16 +65,17 @@ Ankit Kumar Sahoo
 
 Supervisor --> Safety["SAFETY MANAGER
 Responsibility:
-- Evaluate safety conditions
+- Interpret safety events and escalate risk
 
 Encapsulates:
-- <SafetyState>
+- ActiveSafetyCondition
+- FaultFlag
 
 Interface:
-- <evaluate_safety()>
+- evaluate_safety(event)
 
 Owner:
-- TBD
+- Junjunoori Sri chakri
 "]
 
 Supervisor --> Monitoring["MONITORING ENGINE
@@ -118,16 +122,17 @@ Owner:
 
 Monitoring --> SensorDriver["SENSOR DRIVER
 Responsibility:
-- Read hardware sensors
+- Read door position and obstruction sensors
 
 Encapsulates:
-- <RawSensorData>
+- RawSensorData
 
 Interface:
-- <read_position()>
+- read_obstruction()
+- read_position()
 
 Owner:
-- TBD
+- Group
 "]
 ```
 
