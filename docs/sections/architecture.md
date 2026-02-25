@@ -20,16 +20,16 @@ Owner:
 
 System --> UART["UART INTERFACE
 Responsibility:
-Parse external commands
+- Parse external commands
 
 Encapsulates:
-RXBuffer
+- <RXBuffer>
 
 Interface:
-parse_frame()
+- <parse_frame()>
 
 Owner:
-Ankit Kumar Sahoo
+- TBD
 "]
 
 System --> Supervisor["SUPERVISOR / STATE MACHINE
@@ -51,16 +51,16 @@ Owner:
 
 System --> Logger["LOGGER
 Responsibility:
-Record system events
+- Record system events
 
 Encapsulates:
-LogBuffer
+- <LogBuffer>
 
 Interface:
-log_event()
+- <log_event()>
 
 Owner:
-Ankit Kumar Sahoo
+- TBD
 "]
 
 Supervisor --> Safety["SAFETY MANAGER
@@ -94,30 +94,35 @@ Owner:
 
 Supervisor --> Control["CONTROL LOGIC
 Responsibility:
-- Execute motion commands
+- Execute validated motion commands
 
 Encapsulates:
-- <LastCommand>
+- LastCommand
+- CurrentMotion
 
 Interface:
-- <command_open()>
+- command_open()
+- command_close()
+- command_stop()
 
 Owner:
-- Kshitij Maheshwari
+- Ajay Sehrawat
 "]
 
 Control --> MotorDriver["MOTOR DRIVER
 Responsibility:
-- Drive door motor hardware
+- Control motor hardware signals
 
 Encapsulates:
-- <MotorState>
+- MotorState
 
 Interface:
-- <motor_open()>
+- motor_open()
+- motor_close()
+- motor_stop()
 
 Owner:
-- Kshitij Maheshwari
+- TBD
 "]
 
 Monitoring --> SensorDriver["SENSOR DRIVER
@@ -219,9 +224,9 @@ Safety logic is separated from normal control so that faults can override operat
 | Member | Module(s) Owned |
 |--------|------------------|
 |Junjunoori Sri Chakri | Safety Manager |
-| Ajay Sehrawat | Monitoring Engine |
+| Kshitij Maheswari | Monitoring Engine |
 | Ankit Kumar Sahoo | UART Interface + Logger |
-| Kshitij Maheshwari | CControl Logic + Motor Driver |
+| Ajay Sehrawat | CControl Logic + Motor Driver |
 | Shared | Supervisor / State Machine |
 
 ## Module: Supervisor / State Machine
