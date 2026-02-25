@@ -103,7 +103,7 @@ Interface:
 - <command_open()>
 
 Owner:
-- TBD
+- Kshitij Maheshwari
 "]
 
 Control --> MotorDriver["MOTOR DRIVER
@@ -117,7 +117,7 @@ Interface:
 - <motor_open()>
 
 Owner:
-- TBD
+- Kshitij Maheshwari
 "]
 
 Monitoring --> SensorDriver["SENSOR DRIVER
