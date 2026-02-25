@@ -29,7 +29,7 @@ Interface:
 - <parse_frame()>
 
 Owner:
-- TBD
+- Ankit Kumar Sahoo
 "]
 
 System --> Supervisor["SUPERVISOR / STATE MACHINE
@@ -60,7 +60,7 @@ Interface:
 - <log_event()>
 
 Owner:
-- TBD
+- Ankit Kumar Sahoo
 "]
 
 Supervisor --> Safety["SAFETY MANAGER
@@ -89,7 +89,7 @@ Interface:
 - <detect_anomaly()>
 
 Owner:
-- TBD
+- Kshitij Maheswari
 "]
 
 Supervisor --> Control["CONTROL LOGIC
@@ -122,7 +122,7 @@ Interface:
 - motor_stop()
 
 Owner:
-- TBD
+- Ajay sehrawat
 "]
 
 Monitoring --> SensorDriver["SENSOR DRIVER
