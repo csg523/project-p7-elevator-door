@@ -20,16 +20,16 @@ Owner:
 
 System --> UART["UART INTERFACE
 Responsibility:
-- Parse external commands
+Parse external commands
 
 Encapsulates:
-- <RXBuffer>
+RXBuffer
 
 Interface:
-- <parse_frame()>
+parse_frame()
 
 Owner:
-- TBD
+Ankit Kumar Sahoo
 "]
 
 System --> Supervisor["SUPERVISOR / STATE MACHINE
@@ -48,16 +48,16 @@ Owner:
 
 System --> Logger["LOGGER
 Responsibility:
-- Record system events
+Record system events
 
 Encapsulates:
-- <LogBuffer>
+LogBuffer
 
 Interface:
-- <log_event()>
+log_event()
 
 Owner:
-- TBD
+Ankit Kumar Sahoo
 "]
 
 Supervisor --> Safety["SAFETY MANAGER
