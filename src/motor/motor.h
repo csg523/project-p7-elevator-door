@@ -7,7 +7,8 @@
 // =============================================================
 #pragma once
 
-typedef enum {
+typedef enum
+{
     MOTOR_STOPPED = 0,
     MOTOR_OPENING,
     MOTOR_CLOSING
