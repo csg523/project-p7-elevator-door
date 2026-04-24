@@ -1,64 +1,82 @@
-// =============================================================
-// config.h — System-wide constants
-// =============================================================
-#pragma once
+#ifndef CONFIG_H
+#define CONFIG_H
 
-// -------------------------------------------------------
-// TIMING (all in milliseconds)
-// -------------------------------------------------------
-#define COMM_TIMEOUT_MS 2000u         // No valid cmd → FAULT
-#define DOOR_MOTION_SIM_MS 600u       // Simulated door travel time (very fast for instant obstruction detection)
-#define STATE_REPORT_INTERVAL_MS 200u // Periodic $STATE transmit rate
-#define SAFETY_POLL_MS 5u             // Safety task polling interval
-#define FSM_TASK_PERIOD_MS 10u        // FSM task loop period
-#define UART_RX_PERIOD_MS 5u          // UART RX task period
-#define WATCHDOG_PERIOD_MS 500u       // Software watchdog check period
-#define WATCHDOG_TIMEOUT_MS 3000u     // Kick window for FSM task
+#include <stdint.h>
 
-// -------------------------------------------------------
-// QUEUE CAPACITIES
-// -------------------------------------------------------
-#define EVT_QUEUE_SIZE 20
-#define TX_QUEUE_SIZE 50
-#define LOG_QUEUE_SIZE 30
+#define PRIORITY_SAFETY_TASK        5u
+#define PRIORITY_DISPATCHER_TASK    4u
+#define PRIORITY_CONTROL_TASK       4u
+#define PRIORITY_HAL_INPUT_TASK     3u
+#define PRIORITY_UART_TX_TASK       2u
+#define PRIORITY_LOGGER_TASK        1u
 
-// -------------------------------------------------------
-// BUFFER SIZES (bytes)
-// -------------------------------------------------------
-#define UART_BUF_SIZE 128
-#define LOG_MSG_MAX 96
-#define TX_MSG_MAX 96
+/* ---------------------------------------------------------------------------
+ * FreeRTOS Core Assignments (Dual-Core ESP32)
+ * Core 0: HAL / Comms / Logging 
+ * Core 1: Safety / Dispatcher / FSM
+ * --------------------------------------------------------------------------- */
+#define CORE_COMMS      0
+#define CORE_SAFETY     1
 
-// -------------------------------------------------------
-// TASK STACK SIZES (bytes — ESP32 Arduino uses bytes)
-// -------------------------------------------------------
-#define STACK_UART_RX 3072
-#define STACK_FSM 4096
-#define STACK_SAFETY 2048
-#define STACK_UART_TX 2048
-#define STACK_LOGGER 2048
-#define STACK_WATCHDOG 2048
-#define STACK_DISPLAY 4096
 
-// -------------------------------------------------------
-// TASK PRIORITIES  (1 = lowest, 5 = highest used here)
-// -------------------------------------------------------
-#define PRI_LOGGER 1
-#define PRI_UART_TX 2
-#define PRI_UART_RX 3
-#define PRI_WATCHDOG 3
-#define PRI_FSM 4
-#define PRI_SAFETY 5
+#define STACK_SAFETY_TASK       3072u
+#define STACK_DISPATCHER_TASK   3072u
+#define STACK_CONTROL_TASK      4096u  /* FSM + NVS calls need more stack */
+#define STACK_HAL_INPUT_TASK    3072u
+#define STACK_UART_TX_TASK      2048u
+#define STACK_LOGGER_TASK       2048u
 
-// -------------------------------------------------------
-// PROTOCOL
-// -------------------------------------------------------
-#define PROTO_START_CHAR '$'
-#define PROTO_END_CHAR '\n'
-// CRC-8 polynomial (Dallas/Maxim 1-Wire)
-#define CRC8_POLY 0x8Cu
+#define DISPATCHER_QUEUE_DEPTH  16u
+#define UART_TX_QUEUE_DEPTH     8u
+#define LOGGER_QUEUE_DEPTH      16u
 
-// -------------------------------------------------------
-// HARDWARE
-// -------------------------------------------------------
-#define UART_BAUD 115200
+/* ---------------------------------------------------------------------------
+ * Communication & Timing
+ * --------------------------------------------------------------------------- */
+#define COMM_TIMEOUT_MS         10000u
+
+#define STATE_REPORT_INTERVAL_MS 10000u
+
+#define OBSTRUCTION_REACT_MS    100u
+
+#define MOTOR_STALL_TIMEOUT_MS  3600u
+
+#define CLOCK_DRIFT_MARGIN_PCT  20u
+
+/* ---------------------------------------------------------------------------
+ * Debounce
+ * --------------------------------------------------------------------------- */
+#define SENSOR_DEBOUNCE_MS      20u
+
+/* ---------------------------------------------------------------------------
+ * UART Configuration
+ * --------------------------------------------------------------------------- */
+#define UART_PORT_NUM           UART_NUM_0
+#define UART_BAUD_RATE          115200
+#define UART_RX_BUF_SIZE        512u
+#define UART_TX_BUF_SIZE        512u
+#define UART_FRAME_MAX_LEN      64u
+
+/* ---------------------------------------------------------------------------
+ * NVS Namespace & Keys
+ * --------------------------------------------------------------------------- */
+#define NVS_NAMESPACE           "elev_door"
+#define NVS_KEY_FAULT_STATE     "fault_state"
+#define NVS_KEY_FAULT_CODE      "fault_code"
+
+/* ---------------------------------------------------------------------------
+ * TWDT (Task Watchdog Timer)
+ * --------------------------------------------------------------------------- */
+#define TWDT_FEED_INTERVAL_MS   1000u
+
+/* ---------------------------------------------------------------------------
+ * CRC-8 polynomial.
+ * --------------------------------------------------------------------------- */
+#define CRC8_POLYNOMIAL         0x31u
+#define CRC8_INITIAL            0xFFu
+
+
+#define LOG_MSG_MAX_LEN         128u
+#define STACK_REPORT_INTERVAL_MS 5000u
+
+#endif 
