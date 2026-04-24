@@ -12,6 +12,9 @@ The project is developed as part of **CS G523 – Software for Embedded Systems*
 All safety-related decisions are made **locally by the embedded controller** based on inputs received through a simulated UART interface.
 
 ---
+<img width="1408" height="768" alt="architecture" src="https://github.com/user-attachments/assets/4b38630b-7811-4d97-afaf-0fad79eb4301" />
+
+---
 
 ## Problem Statement
 
