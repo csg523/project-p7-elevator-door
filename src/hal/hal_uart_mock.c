@@ -33,6 +33,24 @@ typedef struct {
 static debounce_ctx_t s_dbc_fully_open   = {0, 0, 0, 0};
 static debounce_ctx_t s_dbc_fully_closed = {0, 0, 0, 0};
 static debounce_ctx_t s_dbc_obstruction  = {0, 0, 0, 0};
+static uint8_t s_spof_latched = 0u;
+
+static void debounce_reset(debounce_ctx_t *ctx)
+{
+    ctx->raw_state      = 0u;
+    ctx->stable_state   = 0u;
+    ctx->last_change_ms = 0u;
+    ctx->pending        = 0u;
+}
+
+void hal_reset_sensor_states(void)
+{
+    debounce_reset(&s_dbc_fully_open);
+    debounce_reset(&s_dbc_fully_closed);
+    debounce_reset(&s_dbc_obstruction);
+
+    s_spof_latched = 0u;
+}
 
 static uint8_t crc8_compute(const uint8_t *data, size_t len)
 {
@@ -64,7 +82,7 @@ static uint8_t debounce_update(debounce_ctx_t *ctx, uint8_t new_sample)
     if (ctx->pending) {
         uint32_t elapsed = now_ms - ctx->last_change_ms;
         if (elapsed >= SENSOR_DEBOUNCE_MS) {
-            ctx->stable_state = new_sample;
+            ctx->stable_state = ctx->raw_state;
             ctx->pending      = 0u;
             return 1u; 
         }
@@ -98,6 +116,7 @@ static uint8_t parse_frame(const char *frame, system_event_t *out_evt)
         return 1u;
     }
     if (strncmp(frame, "$CMD,TYPE=RESET", 15) == 0) {
+        hal_reset_sensor_states();
         out_evt->type = EVT_CMD_RESET;
         return 1u;
     }
@@ -105,54 +124,94 @@ static uint8_t parse_frame(const char *frame, system_event_t *out_evt)
     /* SENSOR frames — debounced and SPOF-checked before dispatching */
     if (strncmp(frame, "$SENSOR,OBSTRUCTION=", 20) == 0) {
         uint8_t val = (uint8_t)atoi(frame + 20);
+
         if (debounce_update(&s_dbc_obstruction, val)) {
             out_evt->type    = val ? EVT_OBSTRUCTION_DETECTED : EVT_OBSTRUCTION_CLEAR;
             out_evt->payload = val;
-            return 1u;
+        } else {
+            out_evt->type = EVT_NONE;   // <-- debounce not ready, but VALID
         }
-        out_evt->type = EVT_UNKNOWN;
-        return 0u;
+
+        return 1u;  // ALWAYS ACK
     }
     if (strncmp(frame, "$SENSOR,FULLY_OPEN=", 19) == 0) {
         uint8_t val = (uint8_t)atoi(frame + 19);
         if (debounce_update(&s_dbc_fully_open, val)) {
-            /* Notify safety monitor for SPOF cross-check. */
-            safety_monitor_update_sensors(s_dbc_fully_open.stable_state,
-                                          s_dbc_fully_closed.stable_state);
+
+            /* Reset SPOF latch if condition clears */
+            if (!spof_check(s_dbc_fully_open.stable_state,
+                        s_dbc_fully_closed.stable_state)) {
+                s_spof_latched = 0u;
+            }
+
+            /* SPOF check (latched) */
             if (spof_check(s_dbc_fully_open.stable_state,
-                           s_dbc_fully_closed.stable_state)) {
-                ESP_LOGE(TAG, "SPOF: fully_open && fully_closed simultaneously!");
-                out_evt->type   = EVT_SPOF_DETECTED;
-                out_evt->source = SRC_HAL_SENSOR;
+                       s_dbc_fully_closed.stable_state)) {
+
+                if (!s_spof_latched) {
+                    s_spof_latched = 1u;
+
+                    ESP_LOGE(TAG, "SPOF: fully_open && fully_closed simultaneously!");
+
+                    out_evt->type   = EVT_SPOF_DETECTED;
+                    out_evt->source = SRC_HAL_SENSOR;
+            
+                } else {
+                    out_evt->type = EVT_NONE;
+                }
                 return 1u;
             }
+
+        /* ONLY generate event for =1 */
             if (val) {
                 out_evt->type = EVT_SENSOR_FULLY_OPEN;
-                return 1u;
+            } else {
+                out_evt->type = EVT_NONE;   // <-- IMPORTANT
             }
+
+        } else {
+            out_evt->type = EVT_NONE;   // <-- debounce not ready yet
         }
-        out_evt->type = EVT_UNKNOWN;
-        return 0u;
+
+        return 1u;  // debounce not ready yet
     }
     if (strncmp(frame, "$SENSOR,FULLY_CLOSED=", 21) == 0) {
         uint8_t val = (uint8_t)atoi(frame + 21);
+
         if (debounce_update(&s_dbc_fully_closed, val)) {
-            safety_monitor_update_sensors(s_dbc_fully_open.stable_state,
-                                          s_dbc_fully_closed.stable_state);
+
+            if (!spof_check(s_dbc_fully_open.stable_state,
+                        s_dbc_fully_closed.stable_state)) {
+                s_spof_latched = 0u;
+            }
+
             if (spof_check(s_dbc_fully_open.stable_state,
-                           s_dbc_fully_closed.stable_state)) {
-                ESP_LOGE(TAG, "SPOF: fully_open && fully_closed simultaneously!");
-                out_evt->type   = EVT_SPOF_DETECTED;
-                out_evt->source = SRC_HAL_SENSOR;
+                       s_dbc_fully_closed.stable_state)) {
+
+                if (!s_spof_latched) {
+                    s_spof_latched = 1u;
+
+                    ESP_LOGE(TAG, "SPOF: fully_open && fully_closed simultaneously!");
+
+                    out_evt->type   = EVT_SPOF_DETECTED;
+                    out_evt->source = SRC_HAL_SENSOR;
+                
+                } else {
+                    out_evt->type = EVT_NONE;
+                }
                 return 1u;
             }
             if (val) {
                 out_evt->type = EVT_SENSOR_FULLY_CLOSED;
-                return 1u;
+            } else {
+                out_evt->type = EVT_NONE;   // <-- IMPORTANT
             }
+
+        } else{
+            out_evt->type = EVT_NONE;   // <-- debounce not ready yet
         }
-        out_evt->type = EVT_UNKNOWN;
-        return 0u;
+
+        return 1u;
     }
 
     out_evt->type = EVT_UNKNOWN;
@@ -243,6 +302,12 @@ void hal_uart_rx_task(void *pvParameters)
             frame_buf[frame_len] = '\0';
 
             uint8_t crc_valid = 0u;
+            while (frame_len > 0u && (frame_buf[frame_len - 1u] == ' ' ||
+                                        frame_buf[frame_len - 1u] == '\t')) {
+                frame_len--;
+            }
+            frame_buf[frame_len] = '\0';
+
             if (frame_len > 3u && frame_buf[frame_len - 3u] == ',') {
                 /* Extract declared CRC byte from the trailing ",XX". */
                 char crc_hex[3] = { frame_buf[frame_len - 2u],
@@ -286,10 +351,11 @@ void hal_uart_rx_task(void *pvParameters)
             safety_monitor_reset_comm_watchdog();
 
             /* Push to Dispatcher. Log overflow. */
-            if (dispatcher_post_event(s_dispatcher_queue, &evt) != pdTRUE) {
-                ESP_LOGW(TAG, "Dispatcher queue OVERFLOW — event type 0x%02X dropped",
-                         (unsigned)evt.type);
-            }
+            if (evt.type != EVT_NONE) {
+                if (dispatcher_post_event(s_dispatcher_queue, &evt) != pdTRUE) {
+                    ESP_LOGW(TAG, "Dispatcher queue OVERFLOW — event dropped");
+                }
+            }       
 
             frame_len = 0u;
         } else {

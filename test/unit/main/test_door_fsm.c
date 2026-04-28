@@ -126,7 +126,7 @@ void      fault_nvs_close(void)               {}
 /* ---------------------------------------------------------------------------
  * Dispatcher / Logger Stubs
  * --------------------------------------------------------------------------- */
-QueueHandle_t g_logger_queue = NULL;
+//QueueHandle_t g_logger_queue = NULL;
 
 BaseType_t dispatcher_post_event(QueueHandle_t q, const system_event_t *evt)
 {
@@ -139,7 +139,7 @@ void logger_log_transition(QueueHandle_t q, fsm_state_t a, fsm_state_t b,
 void logger_log_queue_overflow(QueueHandle_t q, const char *n)           { (void)q; (void)n; }
 
 /* esp_timer stub */
-int64_t esp_timer_get_time(void) { return 0LL; }
+//int64_t esp_timer_get_time(void) { return 0LL; }
 
 /* ---------------------------------------------------------------------------
  * Helper: build a typed event with timestamp = 0.
@@ -741,6 +741,7 @@ void test_TC30_reset_noop_in_idle(void)
  * --------------------------------------------------------------------------- */
 void app_main(void)
 {
+    vTaskDelay(pdMS_TO_TICKS(1000));
     UNITY_BEGIN();
 
     RUN_TEST(test_TC01_boot_state_is_homing);

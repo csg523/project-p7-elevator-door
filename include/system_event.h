@@ -28,6 +28,7 @@ typedef enum {
     EVT_HEARTBEAT           = 0x25,  
 
     EVT_UNKNOWN             = 0xFF,  
+    EVT_NONE                = 0x00,
 } event_type_t;
 
 /* ---------------------------------------------------------------------------

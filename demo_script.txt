@@ -1,0 +1,793 @@
+================================================================================
+  ELEVATOR DOOR SAFETY CONTROLLER — FSM TEST COMMANDS
+  All timestamps in seconds (t=N means N seconds from start of that test case)
+================================================================================
+
+TIMING REFERENCE (from config.h provided by user):
+  SENSOR_DEBOUNCE_MS       = 2000  → Send sensor HIGH, resend 2s later to latch
+  MOTOR_STALL_TIMEOUT_MS   = 10000 → With 20% drift: fires at 12000ms = 12s
+  COMM_TIMEOUT_MS          = 2000000 → Not practically reachable; simulated by
+                                       injecting $CMD,TYPE=COMM_TIMEOUT directly
+                                       or by using a dedicated frame (see TC-20)
+  OBSTRUCTION_REACT_MS     = 100   → Immediate reversal (sub-debounce command)
+  STATE_REPORT_INTERVAL_MS = 7000
+
+DEBOUNCE PROTOCOL (applies to ALL $SENSOR,* frames):
+  To ASSERT a sensor (e.g. FULLY_CLOSED=1):
+    t+0:    $SENSOR,FULLY_CLOSED=1     ← raw sample 1 (pending)
+    t+2:    $SENSOR,FULLY_CLOSED=1     ← raw sample 2 (2000ms elapsed → STABLE → event fired)
+
+  To DE-ASSERT a sensor (e.g. FULLY_CLOSED=0):
+    t+0:    $SENSOR,FULLY_CLOSED=0     ← raw sample 1 (pending)
+    t+2:    $SENSOR,FULLY_CLOSED=0     ← raw sample 2 (2000ms elapsed → STABLE)
+
+  Shorthand used below: "ASSERT X" = two lines 2s apart; "DEASSERT X" = two lines 2s apart.
+
+NOTE: Each test case starts fresh (power-cycle or RESET). Timestamps are
+      relative to t=0 of that individual test case. Absolute wall-clock
+      offsets accumulate if run sequentially without re-flashing; adjust
+      accordingly when running on hardware.
+
+CRC: All frames in simulation mode are accepted without CRC suffix
+     (HAL logs a warning and proceeds). Add ",XX" CRC suffix for production.
+
+================================================================================
+TC-01  Boot state is INIT / HOMING                                             
+================================================================================
+PURPOSE: Verify that immediately after power-on the FSM is in HOMING state
+         and the motor drives toward the closed limit.
+
+EXPECTED: Motor CLOSE command issued. State = HOMING. No user command needed.
+
+COMMANDS:
+  (power on / flash device — no UART input required)
+
+OBSERVE on serial monitor:
+  [FSM]   State: 0 → 1 (INIT → HOMING)
+  [HAL]   [ACTUATOR] Motor → CLOSE
+  [FSM]   Homing initiated — driving to closed limit
+
+================================================================================
+TC-02  Homing completes → IDLE on FULLY_CLOSED
+================================================================================
+PURPOSE: FULLY_CLOSED sensor fires during HOMING → FSM transitions to IDLE.
+
+PRECONDITION: Device just powered on (FSM in HOMING, motor CLOSE running).
+
+COMMANDS:
+          $CMD,TYPE=RESET
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← debounce complete → EVT_SENSOR_FULLY_CLOSED
+
+EXPECTED:
+  [FSM]   State: 1 → 2 (HOMING → IDLE)
+  [HAL]   [ACTUATOR] Motor → STOP
+  [FSM]   Homing complete — system IDLE
+
+================================================================================
+TC-03  CMD_OPEN from IDLE → OPENING
+================================================================================
+PURPOSE: A CMD_OPEN in IDLE state starts the motor and transitions to OPENING.
+
+PRECONDITION: Complete TC-02 first (FSM in IDLE).
+
+COMMANDS (continuing from TC-02):
+  t=3:    $CMD,TYPE=OPEN
+
+EXPECTED:
+  [FSM]   State: 2 → 3 (IDLE → OPENING)
+  [HAL]   [ACTUATOR] Motor → OPEN
+  [FSM]   Stall timer started (12000 ms)
+
+================================================================================
+TC-04  FULLY_OPEN sensor → OPEN; stall timer cancelled
+================================================================================
+PURPOSE: FULLY_OPEN sensor fires during OPENING → FSM transitions to OPEN,
+         motor stops, stall timer cancelled.
+
+PRECONDITION: Complete TC-03 (FSM in OPENING).
+
+COMMANDS (continuing from TC-03):
+  t=4:    $SENSOR,FULLY_OPEN=1
+  t=6:    $SENSOR,FULLY_OPEN=1         ← debounce complete → EVT_SENSOR_FULLY_OPEN
+
+EXPECTED:
+  [FSM]   State: 3 → 4 (OPENING → OPEN)
+  [HAL]   [ACTUATOR] Motor → STOP
+  [FSM]   Stall timer cancelled
+
+================================================================================
+TC-05  CMD_CLOSE from OPEN → CLOSING
+================================================================================
+PURPOSE: A CMD_CLOSE in OPEN state starts motor closing and transitions to CLOSING.
+
+PRECONDITION: Complete TC-04 (FSM in OPEN).
+
+COMMANDS (continuing from TC-04):
+  t=7:    $SENSOR,FULLY_OPEN=0
+  t=9:    $SENSOR,FULLY_OPEN=0         ← de-assert FULLY_OPEN (stable low)
+  t=10:   $CMD,TYPE=CLOSE
+
+EXPECTED:
+  [FSM]   State: 4 → 5 (OPEN → CLOSING)
+  [HAL]   [ACTUATOR] Motor → CLOSE
+  [FSM]   Stall timer started (12000 ms)
+
+================================================================================
+TC-06  FULLY_CLOSED sensor during CLOSING → CLOSED
+================================================================================
+PURPOSE: FULLY_CLOSED sensor fires during CLOSING → FSM transitions to CLOSED,
+         motor stops.
+
+PRECONDITION: Complete TC-05 (FSM in CLOSING).
+
+COMMANDS (continuing from TC-05):
+  t=11:   $SENSOR,FULLY_CLOSED=1
+  t=13:   $SENSOR,FULLY_CLOSED=1       ← debounce complete → EVT_SENSOR_FULLY_CLOSED
+
+EXPECTED:
+  [FSM]   State: 5 → 6 (CLOSING → CLOSED)
+  [HAL]   [ACTUATOR] Motor → STOP
+  [FSM]   Stall timer cancelled
+
+================================================================================
+TC-07  CMD_OPEN from CLOSED → OPENING (full round trip)
+================================================================================
+PURPOSE: Full open/close/open round trip from power-on through CLOSED back to OPEN.
+
+PRECONDITION: Fresh power-on.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- First open ---
+  t=3:    $CMD,TYPE=OPEN               ← IDLE → OPENING
+  t=4:    $SENSOR,FULLY_OPEN=1
+  t=6:    $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN
+
+  --- Close ---
+  t=7:    $SENSOR,FULLY_OPEN=0
+  t=9:    $SENSOR,FULLY_OPEN=0
+  t=10:   $CMD,TYPE=CLOSE              ← OPEN → CLOSING
+  t=11:   $SENSOR,FULLY_CLOSED=1
+  t=13:   $SENSOR,FULLY_CLOSED=1       ← CLOSING → CLOSED
+
+  --- Second open (the actual TC-07 assertion) ---
+  t=14:   $SENSOR,FULLY_CLOSED=0
+  t=16:   $SENSOR,FULLY_CLOSED=0
+  t=17:   $CMD,TYPE=OPEN               ← CLOSED → OPENING
+  t=18:   $SENSOR,FULLY_OPEN=1
+  t=20:   $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN
+
+EXPECTED: FSM reaches OPEN again via CLOSED without fault.
+
+================================================================================
+TC-08  Obstruction during CLOSING → immediate OPENING reversal (SR-1)
+================================================================================
+PURPOSE: EVT_OBSTRUCTION_DETECTED while in CLOSING causes immediate motor stop
+         then reversal to OPENING.
+
+PRECONDITION: FSM in CLOSING (run homing → open → start closing).
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Open door ---
+  t=3:    $CMD,TYPE=OPEN
+  t=4:    $SENSOR,FULLY_OPEN=1
+  t=6:    $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN
+
+  --- Start closing ---
+  t=7:    $SENSOR,FULLY_OPEN=0
+  t=9:    $SENSOR,FULLY_OPEN=0
+  t=10:   $CMD,TYPE=CLOSE              ← OPEN → CLOSING
+
+  --- Obstruction during closing ---
+  t=10:   $SENSOR,OBSTRUCTION=1        ← raw sample 1
+  NOTE: Obstruction debounce also needs 2 samples 2s apart.
+  t=12:   $SENSOR,OBSTRUCTION=1        ← debounce complete → EVT_OBSTRUCTION_DETECTED
+
+EXPECTED:
+  [FSM]   Obstruction detected during CLOSING — reversing to OPEN
+  [HAL]   [ACTUATOR] Motor → STOP
+  [HAL]   [ACTUATOR] Motor → OPEN
+  [FSM]   State: 5 → 3 (CLOSING → OPENING)
+
+================================================================================
+TC-09  CMD_CLOSE rejected while obstruction is active (SR-1)
+================================================================================
+PURPOSE: CMD_CLOSE is rejected whenever obstruction_active flag is set.
+
+PRECONDITION: FSM in OPEN state with obstruction asserted.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Open door ---
+  t=3:    $CMD,TYPE=OPEN
+  t=4:    $SENSOR,FULLY_OPEN=1
+  t=6:    $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN
+
+  --- Assert obstruction ---
+  t=7:    $SENSOR,OBSTRUCTION=1
+  t=9:    $SENSOR,OBSTRUCTION=1        ← EVT_OBSTRUCTION_DETECTED (flag set)
+
+  --- Attempt to close (must be rejected) ---
+  t=10:   $CMD,TYPE=CLOSE
+
+EXPECTED:
+  [FSM]   CMD_CLOSE rejected — obstruction active (SR-1)
+  State remains OPEN. Motor CLOSE count = 0.
+
+================================================================================
+TC-10  Obstruction clear re-enables CLOSE (SR-1)
+================================================================================
+PURPOSE: After EVT_OBSTRUCTION_CLEAR, CMD_CLOSE is accepted again.
+
+PRECONDITION: Continue directly from TC-09 (OPEN, obstruction active).
+
+COMMANDS (continuing from TC-09, t=10):
+  --- Clear obstruction ---
+  t=11:   $SENSOR,OBSTRUCTION=0
+  t=13:   $SENSOR,OBSTRUCTION=0        ← EVT_OBSTRUCTION_CLEAR (flag cleared)
+
+  --- Close should now succeed ---
+  t=14:   $CMD,TYPE=CLOSE
+
+EXPECTED:
+  [FSM]   Obstruction cleared — normal operations may resume
+  [FSM]   State: 4 → 5 (OPEN → CLOSING)
+  [HAL]   [ACTUATOR] Motor → CLOSE
+
+================================================================================
+TC-11  CMD_CLOSE during OPENING is rejected — no priority inversion (FR-3)
+================================================================================
+PURPOSE: While door is OPENING, CMD_CLOSE must be dropped (opening has priority).
+
+PRECONDITION: FSM in OPENING.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Start opening ---
+  t=3:    $CMD,TYPE=OPEN               ← IDLE → OPENING
+
+  --- Immediately attempt close (must be rejected) ---
+  t=4:    $CMD,TYPE=CLOSE
+
+EXPECTED:
+  [FSM]   CMD_CLOSE rejected — door is OPENING/HOMING (FR-3)
+  State remains OPENING. Motor CLOSE count = 0.
+
+================================================================================
+TC-12  CMD_OPEN preempts CLOSING (FR-3)
+================================================================================
+PURPOSE: CMD_OPEN while in CLOSING stops the motor and reverses to OPENING.
+
+PRECONDITION: FSM in CLOSING.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Open door ---
+  t=3:    $CMD,TYPE=OPEN
+  t=4:    $SENSOR,FULLY_OPEN=1
+  t=6:    $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN
+
+  --- Start closing ---
+  t=7:    $SENSOR,FULLY_OPEN=0
+  t=9:    $SENSOR,FULLY_OPEN=0
+  t=10:   $CMD,TYPE=CLOSE              ← OPEN → CLOSING
+
+  --- Preempt with OPEN ---
+  t=11:   $CMD,TYPE=OPEN               ← CLOSING → OPENING (preempt)
+
+EXPECTED:
+  [FSM]   CMD_OPEN preempts CLOSING
+  [HAL]   [ACTUATOR] Motor → STOP
+  [HAL]   [ACTUATOR] Motor → OPEN
+  [FSM]   State: 5 → 3 (CLOSING → OPENING)
+
+================================================================================
+TC-13  EMERGENCY_OPEN from CLOSING → OPENING + emergency lock engaged (SR-6)
+================================================================================
+PURPOSE: EVT_CMD_EMERGENCY_OPEN from CLOSING state: motor stops, reverses,
+         and emergency lock is engaged.
+
+PRECONDITION: FSM in CLOSING.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Open door ---
+  t=3:    $CMD,TYPE=OPEN
+  t=4:    $SENSOR,FULLY_OPEN=1
+  t=6:    $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN
+
+  --- Start closing ---
+  t=7:    $SENSOR,FULLY_OPEN=0
+  t=9:    $SENSOR,FULLY_OPEN=0
+  t=10:   $CMD,TYPE=CLOSE              ← OPEN → CLOSING
+
+  --- Emergency open ---
+  t=11:   $CMD,TYPE=EMERGENCY_OPEN
+
+EXPECTED:
+  [FSM]   EMERGENCY OPEN — lock engaged
+  [HAL]   [ACTUATOR] Motor → STOP
+  [HAL]   [ACTUATOR] Motor → OPEN
+  [FSM]   State: 5 → 3 (CLOSING → OPENING)
+  emergency_lock = EMERGENCY_LOCK_ON
+
+================================================================================
+TC-14  CMD_CLOSE rejected under emergency lock (SR-6)
+================================================================================
+PURPOSE: After an EMERGENCY_OPEN, CMD_CLOSE must be rejected until RESET.
+
+PRECONDITION: Emergency lock is ON (continue from TC-13 once OPENING → OPEN).
+
+COMMANDS (continuing from TC-13):
+  --- Wait for door to reach fully open ---
+  t=12:   $SENSOR,FULLY_OPEN=1
+  t=14:   $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN (lock still ON)
+
+  --- Attempt to close (must be rejected) ---
+  t=15:   $CMD,TYPE=CLOSE
+
+EXPECTED:
+  [FSM]   CMD_CLOSE rejected — emergency lock active (SR-6)
+  State remains OPEN. Motor CLOSE count = 0.
+
+================================================================================
+TC-15  RESET clears emergency lock and restarts homing (SR-6, SR-4)
+================================================================================
+PURPOSE: RESET from emergency-locked state clears lock, clears fault, starts homing.
+
+PRECONDITION: Emergency lock ON (continue from TC-14, FSM in OPEN + lock ON).
+
+COMMANDS (continuing from TC-14):
+  t=16:   $CMD,TYPE=RESET
+
+EXPECTED:
+  [FSM]   emergency_lock → EMERGENCY_LOCK_OFF
+  [FSM]   fault_code → FAULT_NONE
+  [FSM]   State: 4 → 1 (OPEN → HOMING)
+  [HAL]   [ACTUATOR] Motor → CLOSE
+  [NVS]   NVS fault cleared
+
+================================================================================
+TC-16  Motor stall during OPENING → FAULT (SR-7)
+================================================================================
+PURPOSE: If the stall timer fires while OPENING, FSM enters FAULT with
+         FAULT_MOTOR_STALL and persists it to NVS.
+
+PRECONDITION: FSM in OPENING (homing done, CMD_OPEN issued).
+
+KEY TIMING: Stall fires after MOTOR_STALL_TIMEOUT_MS × (1 + 20%) = 12000ms = 12s
+            Do NOT send FULLY_OPEN — let the stall timer expire naturally.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Start opening ---
+  t=3:    $CMD,TYPE=OPEN               ← IDLE → OPENING, stall timer starts
+
+  --- Wait 12 seconds WITHOUT sending FULLY_OPEN ---
+  (no commands sent from t=3 to t=15)
+
+  t=15:   (stall timer fires internally at t=3+12 = t≈15)
+
+EXPECTED:
+  [FSM]   Motor stall detected in state OPENING
+  [HAL]   [ACTUATOR] Motor → STOP
+  [FSM]   State: 3 → 7 (OPENING → FAULT)
+  [NVS]   Fault code 1 (FAULT_MOTOR_STALL) persisted to NVS
+
+================================================================================
+TC-17  Motor stall during CLOSING → FAULT (SR-7)
+================================================================================
+PURPOSE: Stall timer expiry while CLOSING causes FAULT.
+
+PRECONDITION: FSM in CLOSING.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Open door ---
+  t=3:    $CMD,TYPE=OPEN
+  t=4:    $SENSOR,FULLY_OPEN=1
+  t=6:    $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN
+
+  --- Start closing ---
+  t=7:    $SENSOR,FULLY_OPEN=0
+  t=9:    $SENSOR,FULLY_OPEN=0
+  t=10:   $CMD,TYPE=CLOSE              ← OPEN → CLOSING, stall timer starts at t=10
+
+  --- Wait 12 seconds WITHOUT sending FULLY_CLOSED ---
+  (no commands from t=10 to t=22)
+
+  t=22:   (stall timer fires internally at t=10+12 = t≈22)
+
+EXPECTED:
+  [FSM]   Motor stall detected in state CLOSING
+  [HAL]   [ACTUATOR] Motor → STOP
+  [FSM]   State: 5 → 7 (CLOSING → FAULT)
+  [NVS]   Fault code 1 (FAULT_MOTOR_STALL) persisted to NVS
+
+================================================================================
+TC-18  Motor stall during HOMING → FAULT (SR-7)
+================================================================================
+PURPOSE: Stall timer expiry during HOMING causes FAULT.
+
+PRECONDITION: Fresh power-on. FSM starts in HOMING immediately. Stall timer
+              starts in fsm_start_homing(). Do NOT send FULLY_CLOSED.
+
+COMMANDS:
+  (power on — FSM auto-starts HOMING with stall timer at t=0)
+  --- Wait 12 seconds WITHOUT sending any sensor ---
+  (no commands from t=0 to t=12)
+
+  t=12:   (stall timer fires internally)
+
+EXPECTED:
+  [FSM]   Motor stall detected in state HOMING
+  [HAL]   [ACTUATOR] Motor → STOP
+  [FSM]   State: 1 → 7 (HOMING → FAULT)
+  [NVS]   Fault code 1 (FAULT_MOTOR_STALL) persisted to NVS
+
+================================================================================
+TC-19  SPOF event → FAULT regardless of current state (SR-3)
+================================================================================
+PURPOSE: If both FULLY_OPEN and FULLY_CLOSED sensors are simultaneously HIGH,
+         the HAL detects SPOF and fires EVT_SPOF_DETECTED → FSM enters FAULT.
+
+PRECONDITION: FSM in IDLE (homing complete). SPOF must come from simultaneous
+              sensor assertion, which the HAL detects automatically.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Assert FULLY_OPEN while FULLY_CLOSED is still high (SPOF condition) ---
+  NOTE: FULLY_CLOSED was last stable=1 from homing. Now assert FULLY_OPEN=1.
+  t=3:    $SENSOR,FULLY_OPEN=1
+  t=5:    $SENSOR,FULLY_OPEN=1         ← debounce passes; HAL sees both=1 → SPOF
+
+EXPECTED:
+  [HAL]   SPOF: fully_open && fully_closed simultaneously!
+  [FSM]   SPOF detected — contradictory sensors
+  [HAL]   [ACTUATOR] Motor → STOP
+  [FSM]   State: 2 → 7 (IDLE → FAULT)
+  fault_code = FAULT_SPOF
+
+NOTE: De-assert FULLY_CLOSED first before asserting FULLY_OPEN in normal operation
+      to avoid accidentally triggering SPOF in other tests.
+
+================================================================================
+TC-20  COMM_TIMEOUT → FAULT (SR-5)
+================================================================================
+PURPOSE: If no valid frame arrives within COMM_TIMEOUT_MS, Safety Monitor fires
+         EVT_COMM_TIMEOUT → FSM enters FAULT.
+
+NOTE: COMM_TIMEOUT_MS = 2,000,000ms (2000 seconds). This is too large to wait
+      for in a test session. On the actual hardware/simulator, the Safety Monitor
+      also generates a comm-timeout event. For test purposes, the FSM can be
+      driven by injecting the frame below if the test harness supports it, or by
+      temporarily reducing COMM_TIMEOUT_MS for the test build.
+
+OPTION A — Reduce timeout in test build (recommended):
+  In platformio.ini [env:test_fsm] build_flags, add:
+    -DCOMM_TIMEOUT_MS=5000
+  Then the safety monitor fires after 5 seconds of silence.
+
+COMMANDS (with COMM_TIMEOUT_MS=5000 for test):
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Open door ---
+  t=3:    $CMD,TYPE=OPEN               ← IDLE → OPENING
+
+  --- Go silent — do NOT send any frame for 5+ seconds ---
+  (no commands from t=3 to t=8)
+
+  t=8:    (Safety Monitor fires EVT_COMM_TIMEOUT internally)
+
+EXPECTED:
+  [SAFETY]  Comm timeout detected
+  [FSM]     Communication timeout — entering FAULT
+  [HAL]     [ACTUATOR] Motor → STOP
+  [FSM]     State: 3 → 7 (OPENING → FAULT)
+  fault_code = FAULT_COMM_TIMEOUT
+
+OPTION B — Inject directly via unit test (fsm_process_event_test):
+  This is already covered in TC-20 of test_door_fsm.c which calls
+  fsm_process_event_test() with EVT_COMM_TIMEOUT directly.
+
+================================================================================
+TC-21  CMD_OPEN in FAULT is rejected (FR-1)
+================================================================================
+PURPOSE: While in FAULT state, CMD_OPEN must be silently rejected.
+
+PRECONDITION: FSM in FAULT (use TC-16 stall sequence to reach FAULT first).
+
+COMMANDS (after reaching FAULT via stall — see TC-16):
+  --- Attempt CMD_OPEN in FAULT ---
+  t=16:   $CMD,TYPE=OPEN
+
+EXPECTED:
+  [FSM]   CMD_OPEN rejected — in FAULT
+  State remains FAULT. Motor OPEN count = 0.
+
+================================================================================
+TC-22  CMD_CLOSE in FAULT is rejected (FR-2)
+================================================================================
+PURPOSE: While in FAULT state, CMD_CLOSE must be silently rejected.
+
+PRECONDITION: FSM in FAULT.
+
+COMMANDS (after reaching FAULT via stall — see TC-16):
+  t=16:   $CMD,TYPE=CLOSE
+
+EXPECTED:
+  [FSM]   CMD_CLOSE rejected — in FAULT
+  State remains FAULT. Motor CLOSE count = 0.
+
+================================================================================
+TC-23  RESET from FAULT → HOMING (safe recovery, SR-4)
+================================================================================
+PURPOSE: RESET from FAULT clears fault code, clears NVS, and restarts homing.
+
+PRECONDITION: FSM in FAULT (any fault path — use SPOF for speed).
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Trigger SPOF fault ---
+  t=3:    $SENSOR,FULLY_OPEN=1
+  t=5:    $SENSOR,FULLY_OPEN=1         ← SPOF → FAULT
+
+  --- RESET to recover ---
+  t=6:    $CMD,TYPE=RESET
+
+EXPECTED:
+  [FSM]   State: 7 → 1 (FAULT → HOMING)
+  [FSM]   fault_code → FAULT_NONE
+  [NVS]   NVS fault cleared
+  [HAL]   [ACTUATOR] Motor → CLOSE
+
+================================================================================
+TC-24  EVT_FAULT_PERSIST on boot → FAULT without homing (SR-4, NFR-3)
+================================================================================
+PURPOSE: If a fault was persisted to NVS in a previous session, the system
+         boots directly into FAULT (via EVT_FAULT_PERSIST injected by app_main).
+
+PRECONDITION: A fault must exist in NVS from a previous power cycle.
+              Best way: run TC-16 to stall → FAULT, then power-cycle the board.
+
+STEP 1 — Cause a fault and power off (so NVS retains it):
+  (Run TC-16: stall during OPENING → FAULT → power off without RESET)
+
+STEP 2 — Power on again. app_main reads NVS, finds fault_code=FAULT_MOTOR_STALL,
+         injects EVT_FAULT_PERSIST to FSM queue.
+
+COMMANDS STEP 2:
+  (power on — no UART input needed)
+  (Wait 50ms for tasks to start — app_main injects EVT_FAULT_PERSIST automatically)
+
+EXPECTED:
+  [MAIN]  Persisted fault detected on boot: code=1
+  [FSM]   NVS fault found on boot — booting into FAULT
+  [FSM]   State: 1 → 7 (HOMING → FAULT)  ← goes FAULT before homing completes
+  fault_code = FAULT_NVS_BOOT (0x05)
+
+  --- Confirm operations blocked ---
+  t=2:    $CMD,TYPE=OPEN
+EXPECTED:
+  [FSM]   CMD_OPEN rejected — in FAULT
+
+================================================================================
+TC-25  Redundant CMD_OPEN in OPEN state → no state change (FR-4)
+================================================================================
+PURPOSE: Sending CMD_OPEN when already OPEN is a no-op.
+
+PRECONDITION: FSM in OPEN.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Open door ---
+  t=3:    $CMD,TYPE=OPEN
+  t=4:    $SENSOR,FULLY_OPEN=1
+  t=6:    $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN
+
+  --- Redundant open ---
+  t=7:    $CMD,TYPE=OPEN
+
+EXPECTED:
+  [FSM]   CMD_OPEN — redundant, no state change
+  State remains OPEN. Motor OPEN count = 0.
+
+================================================================================
+TC-26  Redundant CMD_CLOSE in CLOSED state → no state change (FR-4)
+================================================================================
+PURPOSE: Sending CMD_CLOSE when already CLOSED is a no-op.
+
+PRECONDITION: FSM in CLOSED.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Full open/close cycle ---
+  t=3:    $CMD,TYPE=OPEN
+  t=4:    $SENSOR,FULLY_OPEN=1
+  t=6:    $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN
+  t=7:    $SENSOR,FULLY_OPEN=0
+  t=9:    $SENSOR,FULLY_OPEN=0
+  t=10:   $CMD,TYPE=CLOSE
+  t=11:   $SENSOR,FULLY_CLOSED=1
+  t=13:   $SENSOR,FULLY_CLOSED=1       ← CLOSING → CLOSED
+
+  --- Redundant close ---
+  t=14:   $CMD,TYPE=CLOSE
+
+EXPECTED:
+  [FSM]   CMD_CLOSE — redundant, no state change
+  State remains CLOSED. Motor CLOSE count = 0.
+
+================================================================================
+TC-27  EMERGENCY_OPEN from FAULT overrides fault (SR-6)
+================================================================================
+PURPOSE: Even in FAULT state, EMERGENCY_OPEN forces the door open (safety override).
+
+PRECONDITION: FSM in FAULT.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Open then trigger comm-timeout fault (use stall for determinism) ---
+  t=3:    $CMD,TYPE=OPEN               ← IDLE → OPENING, stall timer starts
+  (wait 12 seconds of silence)
+  t=15:   (stall fires → FAULT)
+
+  --- Emergency override ---
+  t=16:   $CMD,TYPE=EMERGENCY_OPEN
+
+EXPECTED:
+  [FSM]   EMERGENCY OPEN — lock engaged
+  [HAL]   [ACTUATOR] Motor → STOP
+  [HAL]   [ACTUATOR] Motor → OPEN
+  [FSM]   State: 7 → 3 (FAULT → OPENING)
+  emergency_lock = EMERGENCY_LOCK_ON
+
+================================================================================
+TC-28  EMERGENCY_OPEN during CLOSING → OPENING immediately (SR-6, FR-3)
+================================================================================
+PURPOSE: EMERGENCY_OPEN while CLOSING stops the motor immediately and reverses.
+         (Same behaviour as TC-13 but emphasises FR-3 compliance.)
+
+PRECONDITION: FSM in CLOSING.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Open door ---
+  t=3:    $CMD,TYPE=OPEN
+  t=4:    $SENSOR,FULLY_OPEN=1
+  t=6:    $SENSOR,FULLY_OPEN=1         ← OPENING → OPEN
+
+  --- Start closing ---
+  t=7:    $SENSOR,FULLY_OPEN=0
+  t=9:    $SENSOR,FULLY_OPEN=0
+  t=10:   $CMD,TYPE=CLOSE              ← OPEN → CLOSING
+
+  --- Emergency open during closing ---
+  t=11:   $CMD,TYPE=EMERGENCY_OPEN
+
+EXPECTED:
+  [FSM]   EMERGENCY OPEN — lock engaged
+  [HAL]   [ACTUATOR] Motor → STOP
+  [HAL]   [ACTUATOR] Motor → OPEN
+  [FSM]   State: 5 → 3 (CLOSING → OPENING)
+  emergency_lock = EMERGENCY_LOCK_ON
+
+================================================================================
+TC-29  CMD_OPEN during HOMING is rejected (SR-4)
+================================================================================
+PURPOSE: Physical position is unknown during HOMING; CMD_OPEN must be rejected.
+
+PRECONDITION: Fresh power-on. FSM in HOMING.
+
+COMMANDS:
+  (power on — FSM auto-starts HOMING)
+  t=1:    $CMD,TYPE=OPEN               ← attempt while still homing
+
+EXPECTED:
+  [FSM]   CMD_OPEN rejected — homing not complete
+  State remains HOMING. Motor OPEN count = 0.
+
+================================================================================
+TC-30  RESET in non-fault, non-emergency state is a no-op (FR-4)
+================================================================================
+PURPOSE: RESET when not in FAULT and no emergency lock has no effect.
+
+PRECONDITION: FSM in IDLE.
+
+COMMANDS:
+  --- Homing ---
+  t=0:    $SENSOR,FULLY_CLOSED=1
+  t=2:    $SENSOR,FULLY_CLOSED=1       ← HOMING → IDLE
+
+  --- Send RESET in IDLE ---
+  t=3:    $CMD,TYPE=RESET
+
+EXPECTED:
+  [FSM]   RESET received in state IDLE — no action
+  State remains IDLE. No homing restart. Motor CLOSE count = 0.
+
+================================================================================
+  APPENDIX — COMPLETE SEQUENTIAL RUN (all 30 TCs back-to-back on one session)
+================================================================================
+
+Run each block from a fresh power-on OR issue $CMD,TYPE=RESET between TCs
+that leave the FSM in FAULT (TCs 16–20, 24, 27) to return to HOMING before
+the next test.
+
+Between TCs that end in non-FAULT states (OPEN, CLOSED, IDLE), you can continue
+issuing the next TC's setup commands directly without a power cycle.
+
+Recommended reset separator between TCs that end in FAULT:
+  $CMD,TYPE=RESET          ← clears fault, returns to HOMING
+  $SENSOR,FULLY_CLOSED=1
+  (wait 2s)
+  $SENSOR,FULLY_CLOSED=1   ← homing complete → IDLE (ready for next TC)
+
+================================================================================
+  STATE TRANSITION TABLE (summary)
+================================================================================
+
+From \ Event       CMD_OPEN   CMD_CLOSE  EMRG_OPEN  RESET     FULLY_OPEN FULLY_CLOSED  OBSTRUCT   OBS_CLEAR  STALL     SPOF      COMM_TO   FAULT_PERSIST
+INIT/HOMING        REJECT     REJECT     OPENING*   REJECT    -          IDLE          -          -          FAULT     FAULT     FAULT     FAULT
+IDLE               OPENING    REJECT     OPENING*   NO-OP     -          -             -          -          -         FAULT     FAULT     -
+OPENING            NO-OP      REJECT     OPENING*   NO-OP     OPEN       -             -          -          FAULT     FAULT     FAULT     -
+OPEN               NO-OP      CLOSING    OPENING*   NO-OP     -          -             flag-set   flag-clr   -         FAULT     FAULT     -
+CLOSING            OPENING    NO-OP      OPENING*   NO-OP     -          CLOSED        OPENING    flag-clr   FAULT     FAULT     FAULT     -
+CLOSED             OPENING    NO-OP      OPENING*   NO-OP     -          -             -          -          -         FAULT     FAULT     -
+FAULT              REJECT     REJECT     OPENING*   HOMING    -          -             -          -          -         -         -         -
+
+* EMRG_OPEN always: stop, open, set EMERGENCY_LOCK_ON
+  REJECT = command silently dropped, state unchanged
+  NO-OP  = already in target state or command not applicable, no action
+  flag-set = sets obstruction_active=1 internally
+  flag-clr = clears obstruction_active=0 internally
+
+================================================================================
+END OF FILE
+================================================================================

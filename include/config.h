@@ -26,27 +26,27 @@
 #define STACK_UART_TX_TASK      2048u
 #define STACK_LOGGER_TASK       2048u
 
-#define DISPATCHER_QUEUE_DEPTH  16u
-#define UART_TX_QUEUE_DEPTH     8u
+#define DISPATCHER_QUEUE_DEPTH  32u
+#define UART_TX_QUEUE_DEPTH     16u
 #define LOGGER_QUEUE_DEPTH      16u
 
 /* ---------------------------------------------------------------------------
  * Communication & Timing
  * --------------------------------------------------------------------------- */
-#define COMM_TIMEOUT_MS         10000u
+#define COMM_TIMEOUT_MS         2000000u
 
-#define STATE_REPORT_INTERVAL_MS 10000u
+#define STATE_REPORT_INTERVAL_MS 7000u
 
 #define OBSTRUCTION_REACT_MS    100u
 
-#define MOTOR_STALL_TIMEOUT_MS  3600u
+#define MOTOR_STALL_TIMEOUT_MS  100000u
 
 #define CLOCK_DRIFT_MARGIN_PCT  20u
 
 /* ---------------------------------------------------------------------------
  * Debounce
  * --------------------------------------------------------------------------- */
-#define SENSOR_DEBOUNCE_MS      20u
+#define SENSOR_DEBOUNCE_MS      2000u
 
 /* ---------------------------------------------------------------------------
  * UART Configuration
