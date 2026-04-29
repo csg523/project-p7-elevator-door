@@ -17,6 +17,7 @@
 #include "event_dispatcher.h"
 #include "event_logger.h"
 #include "fault_nvs.h"
+#include "display_task.h"
 
 static const char *TAG = "MAIN";
 
@@ -73,6 +74,7 @@ void app_main(void)
 
     
     ESP_ERROR_CHECK(fsm_init());
+    ESP_ERROR_CHECK(display_init());
     ESP_ERROR_CHECK(safety_monitor_init());
 
     
@@ -163,6 +165,16 @@ void app_main(void)
         CORE_COMMS
     );
 
+    xTaskCreatePinnedToCore(
+        display_task, 
+        "DisplayTask",
+        STACK_DISPLAY_TASK,
+        NULL,
+        PRIORITY_DISPLAY_TASK,
+        NULL,          // or &g_task_display if you want stack monitoring
+        CORE_COMMS     // Core 0
+);
+
     ESP_LOGI(TAG, "All tasks spawned");
 
     /* ── 11. Inject boot-fault event if NVS fault was found (SR-4) ──────── */
@@ -186,4 +198,8 @@ void app_main(void)
     }
 
     ESP_LOGI(TAG, "app_main complete — scheduler running");
+
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }

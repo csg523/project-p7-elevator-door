@@ -9,6 +9,7 @@
 #define PRIORITY_HAL_INPUT_TASK     3u
 #define PRIORITY_UART_TX_TASK       2u
 #define PRIORITY_LOGGER_TASK        1u
+#define PRIORITY_DISPLAY_TASK       1u
 
 /* ---------------------------------------------------------------------------
  * FreeRTOS Core Assignments (Dual-Core ESP32)
@@ -25,6 +26,7 @@
 #define STACK_HAL_INPUT_TASK    3072u
 #define STACK_UART_TX_TASK      2048u
 #define STACK_LOGGER_TASK       2048u
+#define STACK_DISPLAY_TASK      3072u
 
 #define DISPATCHER_QUEUE_DEPTH  32u
 #define UART_TX_QUEUE_DEPTH     16u

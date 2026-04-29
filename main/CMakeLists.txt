@@ -7,6 +7,7 @@ idf_component_register(
         "safety/safety_monitor.c"
         "logger/event_logger.c"
         "nvs/fault_nvs.c"
+        "display/display_task.c"
     INCLUDE_DIRS
         "."
         "../include"

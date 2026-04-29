@@ -150,18 +150,18 @@ void logger_task(void *pvParameters)
             }
         }
 
-        uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000LL);
-        if ((now_ms - last_stack_report_ms) >= STACK_REPORT_INTERVAL_MS) {
-            last_stack_report_ms = now_ms;
-            ESP_LOGI(TAG, "--- Stack HWM (words) ---");
-            if (g_task_safety)     ESP_LOGI(TAG, "  SafetyTask:     %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_safety));
-            if (g_task_dispatcher) ESP_LOGI(TAG, "  DispatcherTask: %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_dispatcher));
-            if (g_task_control)    ESP_LOGI(TAG, "  ControlTask:    %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_control));
-            if (g_task_hal_rx)     ESP_LOGI(TAG, "  HAL_RX:         %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_hal_rx));
-            if (g_task_hal_tx)     ESP_LOGI(TAG, "  HAL_TX:         %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_hal_tx));
-            if (g_task_logger)     ESP_LOGI(TAG, "  LoggerTask:     %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_logger));
-            ESP_LOGI(TAG, "-------------------------");
-        }
+        //uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000LL);
+        //if ((now_ms - last_stack_report_ms) >= STACK_REPORT_INTERVAL_MS) {
+        //   last_stack_report_ms = now_ms;
+        //    ESP_LOGI(TAG, "--- Stack HWM (words) ---");
+        //    if (g_task_safety)     ESP_LOGI(TAG, "  SafetyTask:     %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_safety));
+        //    if (g_task_dispatcher) ESP_LOGI(TAG, "  DispatcherTask: %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_dispatcher));
+        //    if (g_task_control)    ESP_LOGI(TAG, "  ControlTask:    %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_control));
+        //    if (g_task_hal_rx)     ESP_LOGI(TAG, "  HAL_RX:         %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_hal_rx));
+        //    if (g_task_hal_tx)     ESP_LOGI(TAG, "  HAL_TX:         %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_hal_tx));
+        //    if (g_task_logger)     ESP_LOGI(TAG, "  LoggerTask:     %u", (unsigned)uxTaskGetStackHighWaterMark(g_task_logger));
+        //    ESP_LOGI(TAG, "-------------------------");
+        //}
 
         vTaskDelay(pdMS_TO_TICKS(10u));
     }
